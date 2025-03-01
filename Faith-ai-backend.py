@@ -29,8 +29,8 @@ user_messages = {}
 # Pricing tiers
 PRICING_TIERS = {
     "small": {"amount": 1000, "messages": 10},  # 10 PLN = 10 messages
-    "medium": {"amount": 2500, "messages": 50}, # 25 PLN = 50 messages
-    "unlimited": {"amount": 10000, "messages": float("inf")}, # 100 PLN = Unlimited messages
+    "medium": {"amount": 2500, "messages": 50},  # 25 PLN = 50 messages
+    "unlimited": {"amount": 10000, "messages": float("inf")},  # 100 PLN = Unlimited messages
 }
 
 # Define request models
@@ -66,31 +66,23 @@ def chat_with_ai(request: ChatRequest):
         openai.api_key = OPENAI_API_KEY
 
         # Send conversation history to OpenAI
-        try:
-    response = openai.ChatCompletion.create(
-        model="gpt-4",
-        messages=user_messages[user_id],
-        temperature=0.7,
-    )
-
-    ai_reply = response['choices'][0]['message']['content']
-    user_messages[user_id].append({"role": "assistant", "content": ai_reply})
-    return {"reply": ai_reply}
-
-except openai.error.OpenAIError as e:
-    raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
-
-except Exception as e:
-    raise HTTPException(status_code=500, detail=f"Unexpected server error: {str(e)}")
+        response = openai.ChatCompletion.create(
+            model="gpt-4",
+            messages=user_messages[user_id],
+            temperature=0.7,
+        )
 
         # Add AI's response to conversation history
         ai_reply = response['choices'][0]['message']['content']
         user_messages[user_id].append({"role": "assistant", "content": ai_reply})
 
         return {"reply": ai_reply}
-    
+
+    except openai.error.OpenAIError as e:
+        raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+
     except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+        raise HTTPException(status_code=500, detail=f"Unexpected server error: {str(e)}")
 
 # Create Stripe Payment Intent (BLIK enabled)
 @app.post("/create-payment-intent")
@@ -122,12 +114,20 @@ def unlock_messages(request: PaymentRequest):
     user_messages[user_id] = []  # Reset the message count for this user
     return {"status": "success", "message": "Messages unlocked!"}
 
+# User Messages Endpoint (to check remaining messages)
+@app.get("/user-messages")
+def get_user_messages(user_id: str):
+    if user_id not in user_messages:
+        return {"remaining": PRICING_TIERS["small"]["messages"]}  # Default to 10 messages for new users
+
+    return {"remaining": PRICING_TIERS["small"]["messages"] - len(user_messages[user_id])}
+
 # Root route to check if API is running
 @app.get("/")
 def read_root():
     return {"message": "Mądrość Biblii API is running."}
 
-# Required for Vercel Deployment (Fixes 404 Issue)
+# Required for Deployment
 def start():
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
