@@ -3,36 +3,37 @@ from pydantic import BaseModel
 import openai
 import os
 import stripe
+import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
-# ✅ Load API keys
+# ✅ Load API keys from environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")  # Make sure to set this in your environment variables
+STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")  # Ensure this is set in your Vercel environment variables
 stripe.api_key = STRIPE_SECRET_KEY
 
 # ✅ Initialize FastAPI app
 app = FastAPI()
 
-# ✅ Allow frontend to connect
+# ✅ Enable CORS to allow frontend connections
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=["*"],  # Change this to specific frontend domain later
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],
 )
 
-# ✅ Store user message counts (temporary in-memory storage; replace with DB in future)
+# ✅ Temporary in-memory storage (Replace with DB later)
 user_messages = {}
 
-# ✅ Pricing tiers
+# ✅ Define pricing tiers
 PRICING_TIERS = {
     "small": {"amount": 1000, "messages": 10},  # 10 PLN = 10 messages
     "medium": {"amount": 2500, "messages": 50}, # 25 PLN = 50 messages
     "unlimited": {"amount": 10000, "messages": float("inf")}, # 100 PLN = Unlimited messages
 }
 
-# ✅ Request models
+# ✅ Define request models
 class ChatRequest(BaseModel):
     user_id: str
     text: str
@@ -105,7 +106,11 @@ def unlock_messages(request: PaymentRequest):
     user_messages[user_id] = plan["messages"]  # ✅ Update message count
     return {"status": "success", "message": "Messages unlocked!"}
 
-# ✅ Define the root `/` route
+# ✅ Root route to check if API is running
 @app.get("/")
 def read_root():
     return {"message": "Mądrość Biblii API is running."}
+
+# ✅ Required for Vercel Deployment (Fixes 404 Issue)
+if __name__ == "__main__":
+    uvicorn.run(app, host="0.0.0.0", port=8000)
