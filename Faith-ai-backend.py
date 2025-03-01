@@ -6,15 +6,15 @@ import stripe
 import uvicorn
 from fastapi.middleware.cors import CORSMiddleware
 
-# ✅ Load API keys from environment variables
+# Load API keys from environment variables
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
 STRIPE_SECRET_KEY = os.getenv("STRIPE_SECRET_KEY")  # Ensure this is set in your Vercel environment variables
 stripe.api_key = STRIPE_SECRET_KEY
 
-# ✅ Initialize FastAPI app
+# Initialize FastAPI app
 app = FastAPI()
 
-# ✅ Enable CORS to allow frontend connections
+# Enable CORS to allow frontend connections
 app.add_middleware(
     CORSMiddleware,
     allow_origins=["*"],  # Change this to specific frontend domain later
@@ -23,17 +23,17 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
-# ✅ Temporary in-memory storage (Replace with DB later)
+# Temporary in-memory storage (Replace with DB later)
 user_messages = {}
 
-# ✅ Define pricing tiers
+# Pricing tiers
 PRICING_TIERS = {
     "small": {"amount": 1000, "messages": 10},  # 10 PLN = 10 messages
     "medium": {"amount": 2500, "messages": 50}, # 25 PLN = 50 messages
     "unlimited": {"amount": 10000, "messages": float("inf")}, # 100 PLN = Unlimited messages
 }
 
-# ✅ Define request models
+# Define request models
 class ChatRequest(BaseModel):
     user_id: str
     text: str
@@ -42,7 +42,7 @@ class PaymentRequest(BaseModel):
     user_id: str
     plan: str  # small, medium, unlimited
 
-# ✅ Chat Endpoint (with message limit)
+# Chat Endpoint (with message limit)
 @app.post("/chat")
 def chat_with_ai(request: ChatRequest):
     user_id = request.user_id
@@ -52,34 +52,36 @@ def chat_with_ai(request: ChatRequest):
 
     # Initialize user messages if new
     if user_id not in user_messages:
-        user_messages[user_id] = 10  # Start with 10 free messages
+        user_messages[user_id] = []
 
-    # Check if user has exceeded their limit
-    if user_messages[user_id] == 0:
+    # Add user input to conversation history
+    user_messages[user_id].append({"role": "user", "content": request.text})
+
+    # Check if user has exceeded their message limit
+    if len(user_messages[user_id]) > PRICING_TIERS["small"]["messages"]:
         raise HTTPException(status_code=402, detail="Message limit reached. Please purchase more messages.")
 
     try:
-        client = openai.OpenAI(api_key=OPENAI_API_KEY)  # Initialize OpenAI client
+        # Initialize OpenAI client
+        openai.api_key = OPENAI_API_KEY
 
-        response = client.chat.completions.create(
-            model="gpt-4o",
-            messages=[
-                {"role": "system", "content": "Jesteś asystentem duchowym o nazwie Mądrość Biblii. Odpowiadasz tylko po polsku, udzielając wskazówek biblijnych, modlitw i mądrości duchowej."},
-                {"role": "user", "content": request.text}
-            ],
-            temperature=0.7
+        # Send conversation history to OpenAI
+        response = openai.Completion.create(
+            model="gpt-4",
+            messages=user_messages[user_id],
+            temperature=0.7,
         )
 
-        # Deduct a message (unless unlimited)
-        if user_messages[user_id] != float("inf"):
-            user_messages[user_id] -= 1
+        # Add AI's response to conversation history
+        ai_reply = response['choices'][0]['message']['content']
+        user_messages[user_id].append({"role": "assistant", "content": ai_reply})
 
-        return {"reply": response.choices[0].message.content}
+        return {"reply": ai_reply}
     
     except Exception as e:
         raise HTTPException(status_code=500, detail=str(e))
 
-# ✅ Create Stripe Payment Intent (BLIK enabled)
+# Create Stripe Payment Intent (BLIK enabled)
 @app.post("/create-payment-intent")
 def create_payment_intent(request: PaymentRequest):
     try:
@@ -90,14 +92,14 @@ def create_payment_intent(request: PaymentRequest):
         intent = stripe.PaymentIntent.create(
             amount=plan["amount"],  # Payment amount in PLN
             currency="pln",
-            payment_method_types=["blik"],  # ✅ Enable BLIK payments
+            payment_method_types=["blik"],  # Enable BLIK payments
         )
 
         return {"clientSecret": intent["client_secret"]}
     except Exception as e:
         raise HTTPException(status_code=400, detail=str(e))
 
-# ✅ Unlock Messages After Payment
+# Unlock Messages After Payment
 @app.post("/unlock-messages")
 def unlock_messages(request: PaymentRequest):
     user_id = request.user_id
@@ -106,15 +108,15 @@ def unlock_messages(request: PaymentRequest):
     if not plan:
         raise HTTPException(status_code=400, detail="Invalid plan selected")
 
-    user_messages[user_id] = plan["messages"]  # ✅ Update message count
+    user_messages[user_id] = []  # Reset the message count for this user
     return {"status": "success", "message": "Messages unlocked!"}
 
-# ✅ Root route to check if API is running
+# Root route to check if API is running
 @app.get("/")
 def read_root():
     return {"message": "Mądrość Biblii API is running."}
 
-# ✅ Required for Vercel Deployment (Fixes 404 Issue)
+# Required for Vercel Deployment (Fixes 404 Issue)
 def start():
     uvicorn.run(app, host="0.0.0.0", port=8000)
 
