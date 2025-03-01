@@ -66,11 +66,22 @@ def chat_with_ai(request: ChatRequest):
         openai.api_key = OPENAI_API_KEY
 
         # Send conversation history to OpenAI
-        response = openai.Completion.create(
-            model="gpt-4",
-            messages=user_messages[user_id],
-            temperature=0.7,
-        )
+        try:
+    response = openai.ChatCompletion.create(
+        model="gpt-4",
+        messages=user_messages[user_id],
+        temperature=0.7,
+    )
+
+    ai_reply = response['choices'][0]['message']['content']
+    user_messages[user_id].append({"role": "assistant", "content": ai_reply})
+    return {"reply": ai_reply}
+
+except openai.error.OpenAIError as e:
+    raise HTTPException(status_code=500, detail=f"OpenAI API error: {str(e)}")
+
+except Exception as e:
+    raise HTTPException(status_code=500, detail=f"Unexpected server error: {str(e)}")
 
         # Add AI's response to conversation history
         ai_reply = response['choices'][0]['message']['content']
