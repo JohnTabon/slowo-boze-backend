@@ -47,6 +47,9 @@ class PaymentRequest(BaseModel):
 def chat_with_ai(request: ChatRequest):
     user_id = request.user_id
 
+    if not user_id:
+        raise HTTPException(status_code=400, detail="User ID is required")
+
     # Initialize user messages if new
     if user_id not in user_messages:
         user_messages[user_id] = 10  # Start with 10 free messages
@@ -112,5 +115,8 @@ def read_root():
     return {"message": "Mądrość Biblii API is running."}
 
 # ✅ Required for Vercel Deployment (Fixes 404 Issue)
-if __name__ == "__main__":
+def start():
     uvicorn.run(app, host="0.0.0.0", port=8000)
+
+if __name__ == "__main__":
+    start()

@@ -2,14 +2,8 @@
   "version": 2,
   "builds": [
     {
-      "src": "faith-ai-backend.py",
+      "src": "Faith-ai-backend.py",
       "use": "@vercel/python"
-    }
-  ],
-  "routes": [
-    {
-      "src": "/(.*)",
-      "dest": "faith-ai-backend.py"
     }
   ]
 }
