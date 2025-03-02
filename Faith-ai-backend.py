@@ -65,10 +65,15 @@ def chat_with_ai(request: ChatRequest):
         # Initialize OpenAI client
         openai.api_key = OPENAI_API_KEY
 
+        # Ensure first message is always a system instruction
+        conversation_history = [
+            {"role": "system", "content": "Jesteś asystentem duchowym o nazwie Mądrość Biblii. Odpowiadasz TYLKO po polsku, oferując porady biblijne, duchowe wsparcie i modlitwy. Nie możesz odpowiadać na tematy świeckie, takie jak zakupy czy pogoda. Twoje odpowiedzi zawsze powinny odnosić się do nauk Jezusa i Pisma Świętego."}
+        ] + user_messages[user_id]  # Append user history
+
         # Send conversation history to OpenAI
         response = openai.chat.completions.create(
             model="gpt-4",
-            messages=user_messages[user_id],
+            messages=conversation_history,
             temperature=0.7,
         )
 
